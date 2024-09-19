@@ -1,0 +1,26 @@
+{
+  "canisters": {
+    "hw2_backend": {
+      "main": "src/hw2_backend/main.mo",
+      "type": "motoko"
+    },
+    "hw2_frontend": {
+      "dependencies": [
+        "hw2_backend"
+      ],
+      "source": [
+        "src/hw2_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "hw2_frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
