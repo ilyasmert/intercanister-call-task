@@ -1,12 +1,16 @@
 {
   "canisters": {
-    "hw2_backend": {
-      "main": "src/hw2_backend/main.mo",
+    "Main": {
+      "main": "src/Main/main.mo",
+      "type": "motoko"
+    },
+    "Bucket": {
+      "main": "src/Bucket/bucket.mo",
       "type": "motoko"
     },
     "hw2_frontend": {
       "dependencies": [
-        "hw2_backend"
+        "Main"
       ],
       "source": [
         "src/hw2_frontend/dist"
