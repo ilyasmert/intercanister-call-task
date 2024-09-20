@@ -17,12 +17,9 @@ actor Main {
     admins.add(Principal.fromText("arorh-yq4cx-ccxg6-l6lqt-5fygp-np567-ak5ti-43yol-priam-jgn4z-iqe"));
   };
 
-  type UserMap = {
-    key: Text;
-    value : Text;
-  };
-
   var bucketCanisterIds = HashMap.HashMap<Text, Bool>(0, Text.equal, Text.hash);
+
+  var searchCanisterId : Text = "";
 
   stable var adminsArray : [Principal] = [];
   stable var bucketCanisterIdsArray : [(Text, Bool)] = [];
@@ -134,12 +131,13 @@ actor Main {
     };
 
     let bucketCanister = CanisterDeclarations.getBucketCanister(activeBucketCanisterId);
-    await bucketCanister.add(key, val);
+    await bucketCanister.add(key, val, caller);
   };
 
-  public composite query func getData(key : Text) : async Result.Result<Text, Text> {
+  public shared composite query ({ caller }) func getData(key : Text) : async Result.Result<(Text, Text), Text> {
+
     let bucketCanister = CanisterDeclarations.getBucketCanister(activeBucketCanisterId);
-    await bucketCanister.read(key);
+    await bucketCanister.read(key, caller);
   };
 
   public query func getBucketCanisterIds() : async Result.Result<[(Text, Bool)], Text> {
