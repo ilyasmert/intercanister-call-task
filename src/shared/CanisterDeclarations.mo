@@ -3,6 +3,14 @@ import Text "mo:base/Text";
 import Principal "mo:base/Principal";
 
 module {
+    public type ContentType = {
+        contentId : Text;
+        content : Text;
+        key : Text;
+        owner : Text;
+        date : Text;
+    };
+
     public type MainCanisterInterface = actor {
         createNewBucketCanister : () -> async Result.Result<Text, Text>;
     };
@@ -13,8 +21,8 @@ module {
     };
 
     public type BucketCanisterInterface = actor {
-        add : (key : Text, val : Text, caller : Principal) -> async Result.Result<Text, Text>;
-        read : query (key : Text, receiver : Principal) -> async Result.Result<(Text, Text), Text>;
+        add : (key : Text, val : Text, contentId : Nat, callerPrincipalId : Principal) -> async Result.Result<Text, Text>;
+        read : query (key : Text, contentId : Nat, receiverPrincipalId : Principal) -> async Result.Result<ContentType, Text>;
     };
 
     public func getBucketCanister(canisterId : Text) : BucketCanisterInterface {

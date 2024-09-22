@@ -6,6 +6,8 @@ import Cycles "mo:base/ExperimentalCycles";
 import HashMap "mo:base/HashMap";
 import Iter "mo:base/Iter";
 import Bool "mo:base/Bool";
+import Nat "mo:base/Nat";
+import Hash "mo:base/Hash";
 import Bucket "../Bucket/bucket";
 import CanisterDeclarations "../shared/CanisterDeclarations";
 
@@ -18,12 +20,35 @@ actor Main {
   };
 
   var bucketCanisterIds = HashMap.HashMap<Text, Bool>(0, Text.equal, Text.hash);
+  var principalAndKeyToContentIdMap = HashMap.HashMap<Text, Nat>(0, Text.equal, Text.hash);
+  var contentIdToBucketCanisterIdMap = HashMap.HashMap<Text, Text>(0, Text.equal, Text.hash);
 
-  var searchCanisterId : Text = "";
 
   stable var adminsArray : [Principal] = [];
   stable var bucketCanisterIdsArray : [(Text, Bool)] = [];
+  stable var principalAndKeyToContentIdMapArray : [(Text, Nat)] = [];
+  stable var contentIdToBucketCanisterIdMapArray : [(Text, Text)] = [];
+
+  stable var contentIdCounter : Nat = 0;
   stable var activeBucketCanisterId : Text = "";
+
+  system func preupgrade() : () {
+    adminsArray := Buffer.toArray<Principal>(admins);
+    bucketCanisterIdsArray := Iter.toArray(bucketCanisterIds.entries());
+    principalAndKeyToContentIdMapArray := Iter.toArray(principalAndKeyToContentIdMap.entries());
+    contentIdToBucketCanisterIdMapArray := Iter.toArray(contentIdToBucketCanisterIdMap.entries());
+  };
+
+  system func postupgrade() : () {
+    admins := Buffer.fromArray(adminsArray);
+    adminsArray := [];
+    bucketCanisterIds := HashMap.fromIter<Text, Bool>(Iter.fromArray(bucketCanisterIdsArray), 0, Text.equal, Text.hash);
+    bucketCanisterIdsArray := [];
+    principalAndKeyToContentIdMap := HashMap.fromIter<Text, Nat>(Iter.fromArray(principalAndKeyToContentIdMapArray), 0, Text.equal, Text.hash);
+    principalAndKeyToContentIdMapArray := [];
+    contentIdToBucketCanisterIdMap := HashMap.fromIter<Text, Text>(Iter.fromArray(contentIdToBucketCanisterIdMapArray), 0, Text.equal, Text.hash);
+    contentIdToBucketCanisterIdMapArray := [];
+  };
 
   private func isAdmin(p : Principal) : Bool {
     return Buffer.contains<Principal>(admins, p, Principal.equal);
@@ -130,14 +155,39 @@ actor Main {
       return #err("anonymous user can not store..");
     };
 
+    let principalAndKey = Principal.toText(caller) # "_" # key;
+
+    if (principalAndKeyToContentIdMap.get(principalAndKey) == null) {
+      contentIdCounter += 1;
+    };
+
+    principalAndKeyToContentIdMap.put(principalAndKey, contentIdCounter);
+    contentIdToBucketCanisterIdMap.put(Nat.toText(contentIdCounter), activeBucketCanisterId);
+
     let bucketCanister = CanisterDeclarations.getBucketCanister(activeBucketCanisterId);
-    await bucketCanister.add(key, val, caller);
+    await bucketCanister.add(key, val, contentIdCounter, caller);
   };
 
-  public shared composite query ({ caller }) func getData(key : Text) : async Result.Result<(Text, Text), Text> {
+  public shared composite query ({ caller }) func getData(key : Text) : async Result.Result<CanisterDeclarations.ContentType, Text> {
 
-    let bucketCanister = CanisterDeclarations.getBucketCanister(activeBucketCanisterId);
-    await bucketCanister.read(key, caller);
+    let principalAndKey = Principal.toText(caller) # "_" # key;
+
+    switch(principalAndKeyToContentIdMap.get(principalAndKey)) {
+      case (null) {
+        return #err("not found..");
+      };
+      case (?val) {
+        switch(contentIdToBucketCanisterIdMap.get(Nat.toText(val))) {
+          case(null) {
+            return #err("content lost..");
+          };
+          case(?searchedCanisterId) {
+            let bucketCanister = CanisterDeclarations.getBucketCanister(searchedCanisterId);
+            await bucketCanister.read(key, val, caller);
+          };
+        };
+      };
+    };
   };
 
   public query func getBucketCanisterIds() : async Result.Result<[(Text, Bool)], Text> {
@@ -146,17 +196,5 @@ actor Main {
     };
 
     return #ok(Iter.toArray(bucketCanisterIds.entries()));
-  };
-
-  system func preupgrade() : () {
-    adminsArray := Buffer.toArray<Principal>(admins);
-    bucketCanisterIdsArray := Iter.toArray(bucketCanisterIds.entries());
-  };
-
-  system func postupgrade() : () {
-    admins := Buffer.fromArray(adminsArray);
-    adminsArray := [];
-    bucketCanisterIds := HashMap.fromIter<Text, Bool>(Iter.fromArray(bucketCanisterIdsArray), 0, Text.equal, Text.hash);
-    bucketCanisterIdsArray := [];
   };
 };
